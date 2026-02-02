@@ -1,14 +1,17 @@
 // app/index.tsx
-import { View, Text, TextInput, Pressable, Alert } from "react-native";
+import { View, Text, TextInput, Pressable, Alert, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
 import { Goal } from "../types/Goal";
 import * as storage from "../storage";
 import * as Haptics from "expo-haptics";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import Purchases from "react-native-purchases";
+import Constants from "expo-constants";
 
 export default function Home() {
   const router = useRouter();
+  const [initializing, setInitializing] = useState(true);
   const [todayGoal, setTodayGoal] = useState<Goal | null>(null);
   const [goalText, setGoalText] = useState("");
   const [streak, setStreak] = useState({ current: 0, longest: 0 });
@@ -16,9 +19,38 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadTodayGoal();
-    loadStreak();
+    async function init() {
+      try {
+        const apiKey = Constants.expoConfig?.extra?.revenuecatApiKey;
+        if (apiKey && apiKey !== "your_revenuecat_api_key_here") {
+          if (Platform.OS === "ios") {
+            await Purchases.configure({ apiKey });
+          } else if (Platform.OS === "android") {
+            await Purchases.configure({ apiKey });
+          }
+        }
+
+        const user = await storage.initializeUser();
+
+        if (!user.hasCompletedOnboarding) {
+          router.replace("/(onboarding)/welcome");
+          return;
+        }
+      } catch (error) {
+        console.error("Initialization error:", error);
+      } finally {
+        setInitializing(false);
+      }
+    }
+    init();
   }, []);
+
+  useEffect(() => {
+    if (!initializing) {
+      loadTodayGoal();
+      loadStreak();
+    }
+  }, [initializing]);
 
   async function loadTodayGoal() {
     const today = storage.getTodayDate();
@@ -104,6 +136,15 @@ export default function Home() {
       return;
     }
     setIsEditing(true);
+  }
+
+  if (initializing) {
+    return (
+      <View className="flex-1 bg-background items-center justify-center">
+        <Text className="text-text-primary text-2xl font-bold">One Goal</Text>
+        <Text className="text-text-secondary text-sm mt-2">Loading...</Text>
+      </View>
+    );
   }
 
   if (loading) {
@@ -217,8 +258,8 @@ export default function Home() {
           <View className="flex-row items-start">
             <View
               className={`w-8 h-8 rounded-full mr-4 items-center justify-center mt-1 ${todayGoal?.completed
-                  ? "bg-success"
-                  : "border-2 border-text-secondary"
+                ? "bg-success"
+                : "border-2 border-text-secondary"
                 }`}
             >
               {todayGoal?.completed && (
@@ -229,8 +270,8 @@ export default function Home() {
             <View className="flex-1">
               <Text
                 className={`text-3xl leading-tight ${todayGoal?.completed
-                    ? "text-text-secondary line-through"
-                    : "text-text-primary"
+                  ? "text-text-secondary line-through"
+                  : "text-text-primary"
                   }`}
                 style={{ fontFamily: "System" }}
               >
