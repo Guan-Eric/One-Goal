@@ -14,7 +14,7 @@ export default {
       backgroundColor: "#000000",
     },
     ios: {
-      bundleIdentifier: 'com.onegoal.app',
+      bundleIdentifier: 'com.onegoaltoday.app',
       supportsTablet: true,
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
@@ -22,7 +22,10 @@ export default {
     },
     plugins: [["expo-font"], "expo-router"],
     extra: {
-      revenuecatApiKey: process.env.REVENUECAT_API_KEY,
+      eas: {
+        projectId: "41b25599-8a49-49ec-b627-7a21cebb166e"
+      },
+      revenuecatApiKey: process.env.REVENUE_CAT_IOS,
     },
     experiments: {
       typedRoutes: true,
