@@ -1,17 +1,18 @@
 // app/index.tsx
 import { View, Text, Platform } from "react-native";
-import { useRouter } from "expo-router";
-import { useState, useEffect } from "react";
+import { Redirect } from "expo-router";
+import { useEffect, useState } from "react";
 import * as storage from "../storage";
 import Purchases from "react-native-purchases";
 import Constants from "expo-constants";
 
+type Destination = "/(onboarding)/welcome" | "/home" | null;
+
 export default function Index() {
-  const router = useRouter();
-  const [initializing, setInitializing] = useState(true);
+  const [destination, setDestination] = useState<Destination>(null);
 
   useEffect(() => {
-    const init = async () => {
+    async function init() {
       try {
         // Initialize RevenueCat
         const apiKey = Constants.expoConfig?.extra?.revenuecatApiKey;
@@ -21,31 +22,28 @@ export default function Index() {
           }
         }
 
-        // Initialize user
+        // Initialize user and decide where to go
         const user = await storage.initializeUser();
-
-        // Route based on onboarding status
-        if (!user.hasCompletedOnboarding) {
-          router.replace("/(onboarding)/welcome");
-        } else {
-          router.replace("/home");
-        }
+        setDestination(user.hasCompletedOnboarding ? "/home" : "/(onboarding)/welcome");
       } catch (error) {
         console.error("Initialization error:", error);
-        // On error, still try to navigate to home
-        router.replace("/home");
-      } finally {
-        setInitializing(false);
+        setDestination("/home");
       }
     }
+
     init();
   }, []);
 
-  // Loading screen
-  return (
-    <View className="flex-1 bg-background items-center justify-center">
-      <Text className="text-text-primary text-2xl font-bold">One Goal</Text>
-      <Text className="text-text-secondary text-sm mt-2">Loading...</Text>
-    </View>
-  );
+  // Show loading until we know where to go
+  if (!destination) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#000000" }}>
+        <Text style={{ color: "#ffffff", fontSize: 24, fontWeight: "bold" }}>One Goal</Text>
+        <Text style={{ color: "#a0a0a0", fontSize: 14, marginTop: 8 }}>Loading...</Text>
+      </View>
+    );
+  }
+
+  // Let Expo Router handle the navigation declaratively
+  return <Redirect href={destination} />;
 }

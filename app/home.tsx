@@ -1,5 +1,5 @@
 // app/home.tsx
-import { View, Text, TextInput, Pressable, Alert } from "react-native";
+import { View, Text, TextInput, Pressable, Alert, KeyboardAvoidingView, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
 import { Goal } from "../types/Goal";
@@ -117,55 +117,61 @@ export default function Home() {
     // Goal creation/editing view
     if (isEditing) {
         return (
-            <View className="flex-1 bg-background px-8 justify-center">
-                <Text className="text-text-primary text-4xl font-bold mb-2">
-                    Today
-                </Text>
-                <Text className="text-text-secondary text-lg mb-12">
-                    What's the one thing?
-                </Text>
-
-                <TextInput
-                    value={goalText}
-                    onChangeText={setGoalText}
-                    placeholder="Make it clear. Make it yours."
-                    placeholderTextColor="#666666"
-                    maxLength={100}
-                    multiline
-                    autoFocus
-                    className="text-text-primary text-2xl mb-8 min-h-[80px]"
-                    style={{ fontFamily: "System" }}
-                />
-
-                <Pressable
-                    onPress={createOrUpdateGoal}
-                    className="bg-primary py-6 rounded-2xl items-center scale-press"
-                >
-                    <Text className="text-background text-xl font-semibold">
-                        {todayGoal ? "Update" : "Set Goal"}
+            <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                className="flex-1 bg-background"
+                keyboardVerticalOffset={100}
+            >
+                <View className="flex-1 bg-background px-8 justify-center">
+                    <Text className="text-text-primary text-4xl font-bold mb-2">
+                        Today
                     </Text>
-                </Pressable>
+                    <Text className="text-text-secondary text-lg mb-12">
+                        What's the one thing?
+                    </Text>
 
-                {todayGoal && (
-                    <Pressable
-                        onPress={() => setIsEditing(false)}
-                        className="py-4 items-center mt-4"
-                    >
-                        <Text className="text-text-secondary">Cancel</Text>
-                    </Pressable>
-                )}
-
-                <Pressable
-                    onPress={() => router.push("/history")}
-                    className="absolute top-16 right-8"
-                >
-                    <MaterialCommunityIcons
-                        name="calendar-outline"
-                        size={28}
-                        color="#666666"
+                    <TextInput
+                        value={goalText}
+                        onChangeText={setGoalText}
+                        placeholder="Make it clear. Make it yours."
+                        placeholderTextColor="#666666"
+                        maxLength={100}
+                        multiline
+                        autoFocus
+                        className="text-text-primary text-2xl mb-8 min-h-[80px]"
+                        style={{ fontFamily: "System" }}
                     />
-                </Pressable>
-            </View>
+
+                    <Pressable
+                        onPress={createOrUpdateGoal}
+                        className="bg-primary py-6 rounded-2xl items-center scale-press"
+                    >
+                        <Text className="text-background text-xl font-semibold">
+                            {todayGoal ? "Update" : "Set Goal"}
+                        </Text>
+                    </Pressable>
+
+                    {todayGoal && (
+                        <Pressable
+                            onPress={() => setIsEditing(false)}
+                            className="py-4 items-center mt-4"
+                        >
+                            <Text className="text-text-secondary">Cancel</Text>
+                        </Pressable>
+                    )}
+
+                    <Pressable
+                        onPress={() => router.push("/history")}
+                        className="absolute top-16 right-8"
+                    >
+                        <MaterialCommunityIcons
+                            name="calendar-outline"
+                            size={28}
+                            color="#666666"
+                        />
+                    </Pressable>
+                </View>
+            </KeyboardAvoidingView>
         );
     }
 
@@ -261,7 +267,7 @@ export default function Home() {
             {todayGoal?.completed && (
                 <View className="px-8 pb-12">
                     <Text className="text-text-muted text-center text-sm">
-                        🎉 Done for today. See you tomorrow!
+                        Done for today. See you tomorrow!
                     </Text>
                 </View>
             )}

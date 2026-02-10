@@ -27,7 +27,7 @@ export default function PaywallScreen() {
       const apiKey = Constants.expoConfig?.extra?.revenuecatApiKey;
       if (apiKey && apiKey !== "your_revenuecat_api_key_here") {
         await Purchases.configure({ apiKey });
-        
+
         // Get current user ID
         const user = await storage.getUser();
         if (user) {
@@ -115,9 +115,9 @@ export default function PaywallScreen() {
       "You'll have access to core features. Upgrade anytime to unlock premium benefits.",
       [
         { text: "Cancel", style: "cancel" },
-        { 
-          text: "Continue Free", 
-          onPress: completeOnboarding 
+        {
+          text: "Continue Free",
+          onPress: completeOnboarding
         },
       ]
     );
@@ -126,7 +126,7 @@ export default function PaywallScreen() {
   async function handleRestore() {
     try {
       const customerInfo = await Purchases.restorePurchases();
-      
+
       if (customerInfo.entitlements.active["premium"]) {
         const user = await storage.getUser();
         if (user) {
@@ -148,7 +148,7 @@ export default function PaywallScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScrollView 
+      <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 200 }}
         showsVerticalScrollIndicator={false}
@@ -159,7 +159,7 @@ export default function PaywallScreen() {
             <Text className="text-text-primary text-5xl font-bold text-center mb-4">
               Unlock{"\n"}Premium
             </Text>
-            
+
             <Text className="text-text-secondary text-xl text-center mb-12 leading-relaxed">
               Get the most out of your{"\n"}daily goal practice
             </Text>
@@ -168,32 +168,32 @@ export default function PaywallScreen() {
           {/* Premium Features */}
           <Animated.View entering={FadeInDown.delay(300).duration(600)}>
             <View className="bg-surface-elevated rounded-3xl p-6 mb-8 border border-border">
-              <PremiumFeature 
+              <PremiumFeature
                 icon="history"
                 title="Unlimited History"
                 description="Access all your past goals forever"
               />
-              <PremiumFeature 
+              <PremiumFeature
                 icon="cloud-sync"
                 title="Cloud Sync"
                 description="Seamlessly sync across all devices"
               />
-              <PremiumFeature 
+              <PremiumFeature
                 icon="notebook-edit"
                 title="Reflection Notes"
                 description="Add thoughts after completing goals"
               />
-              <PremiumFeature 
+              <PremiumFeature
                 icon="chart-box"
                 title="Advanced Stats"
                 description="Detailed insights & patterns"
               />
-              <PremiumFeature 
+              <PremiumFeature
                 icon="palette"
                 title="Custom Themes"
                 description="8 beautiful color schemes"
               />
-              <PremiumFeature 
+              <PremiumFeature
                 icon="widgets"
                 title="Home Screen Widget"
                 description="See your goal without opening app"
@@ -214,9 +214,8 @@ export default function PaywallScreen() {
                 setSelectedPlan("annual");
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               }}
-              className={`mb-4 rounded-3xl overflow-hidden border-2 ${
-                selectedPlan === "annual" ? 'border-primary' : 'border-border'
-              }`}
+              className={`mb-4 rounded-3xl overflow-hidden border-2 ${selectedPlan === "annual" ? 'border-primary' : 'border-border'
+                }`}
             >
               <View className="bg-surface-elevated p-6">
                 {/* Best Value Badge */}
@@ -260,9 +259,8 @@ export default function PaywallScreen() {
                 setSelectedPlan("monthly");
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               }}
-              className={`mb-6 rounded-3xl overflow-hidden border-2 ${
-                selectedPlan === "monthly" ? 'border-primary' : 'border-border'
-              }`}
+              className={`mb-6 rounded-3xl overflow-hidden border-2 ${selectedPlan === "monthly" ? 'border-primary' : 'border-border'
+                }`}
             >
               <View className="bg-surface-elevated p-6">
                 <View className="flex-row items-center justify-between">
@@ -339,9 +337,9 @@ export default function PaywallScreen() {
               Continue Free
             </Text>
           </Pressable>
-          
+
           <Text className="text-text-muted">•</Text>
-          
+
           <Pressable onPress={handleRestore}>
             <Text className="text-text-secondary text-sm font-semibold">
               Restore Purchase
@@ -353,14 +351,14 @@ export default function PaywallScreen() {
   );
 }
 
-function PremiumFeature({ 
-  icon, 
-  title, 
+function PremiumFeature({
+  icon,
+  title,
   description,
-  isLast = false 
-}: { 
-  icon: string; 
-  title: string; 
+  isLast = false
+}: {
+  icon: string;
+  title: string;
   description: string;
   isLast?: boolean;
 }) {
