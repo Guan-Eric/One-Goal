@@ -11,7 +11,7 @@ export default function Index() {
   const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    async function init() {
+    const init = async () => {
       try {
         // Initialize RevenueCat
         const apiKey = Constants.expoConfig?.extra?.revenuecatApiKey;
