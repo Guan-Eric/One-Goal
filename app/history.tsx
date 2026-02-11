@@ -5,9 +5,13 @@ import { useState, useEffect } from "react";
 import { Goal } from "../types/Goal";
 import * as storage from "../storage";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { usePremium } from "../context/PremiumContext";
+
+const FREE_HISTORY_LIMIT = 7; // Free users see last 7 days
 
 export default function History() {
   const router = useRouter();
+  const { isPremium, activeTheme: t } = usePremium();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [streak, setStreak] = useState({ current: 0, longest: 0 });
 
@@ -19,141 +23,139 @@ export default function History() {
     const allGoals = await storage.getAllGoals();
     const sorted = allGoals.sort((a, b) => b.date.localeCompare(a.date));
     setGoals(sorted);
-
-    const currentStreak = await storage.getStreak();
-    setStreak(currentStreak);
+    const s = await storage.getStreak();
+    setStreak(s);
   }
 
+  // Free users only see last 7 days
+  const visibleGoals = isPremium ? goals : goals.slice(0, FREE_HISTORY_LIMIT);
+  const hiddenCount = goals.length - visibleGoals.length;
+
   function formatDate(dateString: string): string {
-    const date = new Date(dateString);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    if (dateString === today.toISOString().split("T")[0]) {
-      return "Today";
-    } else if (dateString === yesterday.toISOString().split("T")[0]) {
-      return "Yesterday";
-    }
-
-    return date.toLocaleDateString(undefined, {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
+    const today = storage.getTodayDate();
+    const yesterday = storage.getYesterdayDate();
+    if (dateString === today) return "Today";
+    if (dateString === yesterday) return "Yesterday";
+    return new Date(dateString).toLocaleDateString(undefined, {
+      weekday: "short", month: "short", day: "numeric",
     });
   }
 
-  function getDayOfWeek(dateString: string): string {
-    const date = new Date(dateString);
-    return date.toLocaleDateString(undefined, { weekday: "short" });
-  }
-
   return (
-    <View className="flex-1 bg-background">
+    <View style={{ flex: 1, backgroundColor: t.background }}>
       {/* Header */}
-      <View className="px-8 pt-16 pb-6">
-        <View className="flex-row items-center justify-between mb-6">
+      <View style={{ paddingHorizontal: 32, paddingTop: 64, paddingBottom: 24 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
           <Pressable onPress={() => router.back()}>
-            <MaterialCommunityIcons
-              name="arrow-left"
-              size={28}
-              color="#ffffff"
-            />
+            <MaterialCommunityIcons name="arrow-left" size={28} color={t.textPrimary} />
           </Pressable>
-
-          <Text className="text-text-primary text-2xl font-bold">History</Text>
-
+          <Text style={{ color: t.textPrimary, fontSize: 22, fontWeight: "bold" }}>History</Text>
           <View style={{ width: 28 }} />
         </View>
 
-        {/* Stats */}
-        <View className="flex-row justify-between py-4 border-t border-b border-border">
-          <View>
-            <Text className="text-text-primary text-3xl font-bold">
-              {streak.current}
-            </Text>
-            <Text className="text-text-secondary text-sm mt-1">
-              Current Streak
-            </Text>
-          </View>
-
-          <View>
-            <Text className="text-text-primary text-3xl font-bold">
-              {streak.longest}
-            </Text>
-            <Text className="text-text-secondary text-sm mt-1">
-              Best Streak
-            </Text>
-          </View>
-
-          <View>
-            <Text className="text-text-primary text-3xl font-bold">
-              {goals.filter((g) => g.completed).length}
-            </Text>
-            <Text className="text-text-secondary text-sm mt-1">
-              Total Goals
-            </Text>
-          </View>
+        {/* Stats row */}
+        <View style={{
+          flexDirection: "row", justifyContent: "space-between",
+          paddingVertical: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: t.border,
+        }}>
+          <StatBox label="Current Streak" value={`${streak.current}`} t={t} />
+          <StatBox label="Best Streak" value={`${streak.longest}`} t={t} />
+          <StatBox label="Completed" value={`${goals.filter((g) => g.completed).length}`} t={t} />
         </View>
       </View>
 
       {/* Goals List */}
-      <ScrollView className="flex-1 px-8" showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1, paddingHorizontal: 32 }} showsVerticalScrollIndicator={false}>
         {goals.length === 0 ? (
-          <View className="py-20 items-center">
-            <Text className="text-text-muted text-center text-lg">
+          <View style={{ paddingVertical: 80, alignItems: "center" }}>
+            <Text style={{ color: t.textMuted, textAlign: "center", fontSize: 18 }}>
               No goals yet.{"\n"}Start today!
             </Text>
           </View>
         ) : (
-          goals.map((goal) => (
-            <View
-              key={goal.id}
-              className="py-6 border-b border-border"
-            >
-              <View className="flex-row justify-between items-start mb-2">
-                <Text className="text-text-secondary text-sm">
-                  {formatDate(goal.date)}
-                </Text>
-                <View
-                  className={`px-2 py-0.5 rounded ${
-                    goal.completed ? "bg-success/20" : "bg-incomplete/20"
-                  }`}
-                >
-                  <Text
-                    className={`text-xs ${
-                      goal.completed ? "text-success" : "text-incomplete"
-                    }`}
-                  >
-                    {goal.completed ? "✓ Done" : "✗ Missed"}
-                  </Text>
+          <>
+            {visibleGoals.map((goal) => (
+              <View key={goal.id} style={{ paddingVertical: 20, borderBottomWidth: 1, borderColor: t.border }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                  <Text style={{ color: t.textSecondary, fontSize: 13 }}>{formatDate(goal.date)}</Text>
+                  <View style={{
+                    paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6,
+                    backgroundColor: goal.completed ? t.success + "33" : t.incomplete + "33",
+                  }}>
+                    <Text style={{ fontSize: 12, color: goal.completed ? t.success : t.incomplete }}>
+                      {goal.completed ? "✓ Done" : "✗ Missed"}
+                    </Text>
+                  </View>
                 </View>
-              </View>
 
-              <Text
-                className={`text-xl ${
-                  goal.completed
-                    ? "text-text-primary"
-                    : "text-text-secondary"
-                }`}
-              >
-                {goal.title}
-              </Text>
-
-              {goal.completed && goal.completedAt && (
-                <Text className="text-text-muted text-xs mt-2">
-                  {new Date(goal.completedAt).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                <Text style={{
+                  fontSize: 18,
+                  color: goal.completed ? t.textPrimary : t.textSecondary,
+                  textDecorationLine: goal.completed ? "none" : "none",
+                }}>
+                  {goal.title}
                 </Text>
-              )}
-            </View>
-          ))
+
+                {goal.completed && goal.completedAt && (
+                  <Text style={{ color: t.textMuted, fontSize: 12, marginTop: 4 }}>
+                    {new Date(goal.completedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </Text>
+                )}
+
+                {/* Reflection (premium only) */}
+                {isPremium && goal.reflection ? (
+                  <View style={{
+                    marginTop: 8, paddingLeft: 12,
+                    borderLeftWidth: 2, borderLeftColor: t.primary + "66",
+                  }}>
+                    <Text style={{ color: t.textSecondary, fontSize: 13, fontStyle: "italic" }}>
+                      "{goal.reflection}"
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            ))}
+
+            {/* Free upsell banner */}
+            {!isPremium && hiddenCount > 0 && (
+              <Pressable
+                onPress={() => router.push("/(onboarding)/paywall")}
+                style={{
+                  marginTop: 16, marginBottom: 32, padding: 20,
+                  backgroundColor: t.surfaceElevated,
+                  borderRadius: 16, borderWidth: 1, borderColor: t.primary + "55",
+                  alignItems: "center",
+                }}
+              >
+                <MaterialCommunityIcons name="lock" size={24} color={t.primary} />
+                <Text style={{ color: t.textPrimary, fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
+                  {hiddenCount} more goal{hiddenCount > 1 ? "s" : ""} hidden
+                </Text>
+                <Text style={{ color: t.textSecondary, fontSize: 14, marginTop: 4, textAlign: "center" }}>
+                  Upgrade to Premium for unlimited history
+                </Text>
+                <View style={{
+                  marginTop: 12, backgroundColor: t.primary,
+                  paddingHorizontal: 24, paddingVertical: 10, borderRadius: 20,
+                }}>
+                  <Text style={{ color: t.background, fontWeight: "600" }}>Unlock Premium</Text>
+                </View>
+              </Pressable>
+            )}
+          </>
         )}
 
-        <View className="h-20" />
+        <View style={{ height: 40 }} />
       </ScrollView>
+    </View>
+  );
+}
+
+function StatBox({ label, value, t }: { label: string; value: string; t: any }) {
+  return (
+    <View style={{ alignItems: "center" }}>
+      <Text style={{ color: t.textPrimary, fontSize: 28, fontWeight: "bold" }}>{value}</Text>
+      <Text style={{ color: t.textSecondary, fontSize: 12, marginTop: 4 }}>{label}</Text>
     </View>
   );
 }

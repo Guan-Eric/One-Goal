@@ -1,19 +1,28 @@
 // app/home.tsx
-import { View, Text, TextInput, Pressable, Alert, KeyboardAvoidingView, Platform } from "react-native";
+import {
+    View, Text, TextInput, Pressable, Alert,
+    KeyboardAvoidingView, Platform, Modal, StyleSheet,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
 import { Goal } from "../types/Goal";
 import * as storage from "../storage";
 import * as Haptics from "expo-haptics";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { usePremium } from "../context/PremiumContext";
 
 export default function Home() {
     const router = useRouter();
+    const { isPremium, activeTheme: t } = usePremium();
+
     const [todayGoal, setTodayGoal] = useState<Goal | null>(null);
     const [goalText, setGoalText] = useState("");
     const [streak, setStreak] = useState({ current: 0, longest: 0 });
     const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [showReflection, setShowReflection] = useState(false);
+    const [reflectionText, setReflectionText] = useState("");
+    const [pendingCompleted, setPendingCompleted] = useState<Goal | null>(null);
 
     useEffect(() => {
         loadTodayGoal();
@@ -30,8 +39,8 @@ export default function Home() {
     }
 
     async function loadStreak() {
-        const currentStreak = await storage.getStreak();
-        setStreak(currentStreak);
+        const s = await storage.getStreak();
+        setStreak(s);
     }
 
     async function createOrUpdateGoal() {
@@ -39,21 +48,17 @@ export default function Home() {
             Alert.alert("Empty goal", "Please write what you want to accomplish today.");
             return;
         }
-
         const today = storage.getTodayDate();
-
         if (todayGoal) {
-            // Update existing goal
             const updated = { ...todayGoal, title: goalText.trim() };
             await storage.saveGoal(updated);
             setTodayGoal(updated);
             setIsEditing(false);
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         } else {
-            // Create new goal
             const newGoal: Goal = {
                 id: `goal_${Date.now()}`,
-                userId: "local", // Will be replaced with actual user ID when auth is added
+                userId: "local",
                 date: today,
                 title: goalText.trim(),
                 completed: false,
@@ -68,39 +73,44 @@ export default function Home() {
 
     async function completeGoal() {
         if (!todayGoal) return;
-
-        const completed: Goal = {
-            ...todayGoal,
-            completed: true,
-            completedAt: Date.now(),
-        };
-
+        const completed: Goal = { ...todayGoal, completed: true, completedAt: Date.now() };
         await storage.saveGoal(completed);
         setTodayGoal(completed);
-
-        // Update streak
         const newStreak = await storage.updateStreak(todayGoal.date);
         setStreak(newStreak);
-
-        // Celebration haptics
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
+        if (isPremium) {
+            setPendingCompleted(completed);
+            setReflectionText(completed.reflection || "");
+            setShowReflection(true);
+        } else {
+            Alert.alert(
+                "🎉 Goal Complete!",
+                newStreak.current > 1 ? `${newStreak.current} day streak!` : "Great job today!",
+                [{ text: "Done" }]
+            );
+        }
+    }
+
+    async function saveReflection() {
+        if (!pendingCompleted) return;
+        const withReflection: Goal = { ...pendingCompleted, reflection: reflectionText.trim() };
+        await storage.saveGoal(withReflection);
+        setTodayGoal(withReflection);
+        setShowReflection(false);
+        setPendingCompleted(null);
+        const s = await storage.getStreak();
         Alert.alert(
             "🎉 Goal Complete!",
-            newStreak.current > 1
-                ? `${newStreak.current} day streak!`
-                : "Great job today!",
-            [{ text: "Done", style: "default" }]
+            s.current > 1 ? `${s.current} day streak!` : "Great job today!",
+            [{ text: "Done" }]
         );
     }
 
     async function editGoal() {
         if (todayGoal?.completed) {
-            Alert.alert(
-                "Goal Completed",
-                "You can't edit a completed goal. This preserves your achievement.",
-                [{ text: "OK" }]
-            );
+            Alert.alert("Goal Completed", "You can't edit a completed goal.", [{ text: "OK" }]);
             return;
         }
         setIsEditing(true);
@@ -108,169 +118,195 @@ export default function Home() {
 
     if (loading) {
         return (
-            <View className="flex-1 bg-background items-center justify-center">
-                <Text className="text-text-primary text-2xl">One Goal</Text>
+            <View style={{ flex: 1, backgroundColor: t.background, alignItems: "center", justifyContent: "center" }}>
+                <Text style={{ color: t.textPrimary, fontSize: 24 }}>One Goal</Text>
             </View>
         );
     }
 
-    // Goal creation/editing view
     if (isEditing) {
         return (
             <KeyboardAvoidingView
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
-                className="flex-1 bg-background"
+                style={{ flex: 1, backgroundColor: t.background }}
                 keyboardVerticalOffset={100}
             >
-                <View className="flex-1 bg-background px-8 justify-center">
-                    <Text className="text-text-primary text-4xl font-bold mb-2">
-                        Today
-                    </Text>
-                    <Text className="text-text-secondary text-lg mb-12">
-                        What's the one thing?
-                    </Text>
+                <View style={{ flex: 1, paddingHorizontal: 32, justifyContent: "center" }}>
+                    <Text style={{ color: t.textPrimary, fontSize: 36, fontWeight: "bold", marginBottom: 8 }}>Today</Text>
+                    <Text style={{ color: t.textSecondary, fontSize: 18, marginBottom: 48 }}>What's the one thing?</Text>
 
                     <TextInput
                         value={goalText}
                         onChangeText={setGoalText}
                         placeholder="Make it clear. Make it yours."
-                        placeholderTextColor="#666666"
+                        placeholderTextColor={t.textMuted}
                         maxLength={100}
                         multiline
                         autoFocus
-                        className="text-text-primary text-2xl mb-8 min-h-[80px]"
-                        style={{ fontFamily: "System" }}
+                        style={{ color: t.textPrimary, fontSize: 24, marginBottom: 32, minHeight: 80 }}
                     />
 
                     <Pressable
                         onPress={createOrUpdateGoal}
-                        className="bg-primary py-6 rounded-2xl items-center scale-press"
+                        style={{ backgroundColor: t.primary, paddingVertical: 24, borderRadius: 16, alignItems: "center" }}
                     >
-                        <Text className="text-background text-xl font-semibold">
+                        <Text style={{ color: t.background, fontSize: 20, fontWeight: "600" }}>
                             {todayGoal ? "Update" : "Set Goal"}
                         </Text>
                     </Pressable>
 
                     {todayGoal && (
-                        <Pressable
-                            onPress={() => setIsEditing(false)}
-                            className="py-4 items-center mt-4"
-                        >
-                            <Text className="text-text-secondary">Cancel</Text>
+                        <Pressable onPress={() => setIsEditing(false)} style={{ paddingVertical: 16, alignItems: "center", marginTop: 16 }}>
+                            <Text style={{ color: t.textSecondary }}>Cancel</Text>
                         </Pressable>
                     )}
 
-                    <Pressable
-                        onPress={() => router.push("/history")}
-                        className="absolute top-16 right-8"
-                    >
-                        <MaterialCommunityIcons
-                            name="calendar-outline"
-                            size={28}
-                            color="#666666"
-                        />
+                    <Pressable onPress={() => router.push("/history")} style={{ position: "absolute", top: 64, right: 32 }}>
+                        <MaterialCommunityIcons name="calendar-outline" size={28} color={t.textMuted} />
                     </Pressable>
                 </View>
             </KeyboardAvoidingView>
         );
     }
 
-    // Goal view (main screen)
     return (
-        <View className="flex-1 bg-background">
+        <View style={{ flex: 1, backgroundColor: t.background }}>
             {/* Header */}
-            <View className="px-8 pt-16 pb-4 flex-row justify-between items-center">
+            <View style={{ paddingHorizontal: 32, paddingTop: 64, paddingBottom: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                 <View>
-                    <Text className="text-text-secondary text-sm">
-                        {streak.current > 0 ? `🔥 ${streak.current} day streak` : "Start your streak"}
+                    <Text style={{ color: t.textSecondary, fontSize: 14 }}>
+                        {streak.current > 0 ? `${streak.current} day streak` : "Start your streak"}
                     </Text>
                     {streak.longest > 0 && streak.longest !== streak.current && (
-                        <Text className="text-text-muted text-xs mt-1">
-                            Best: {streak.longest} days
-                        </Text>
+                        <Text style={{ color: t.textMuted, fontSize: 12, marginTop: 4 }}>Best: {streak.longest} days</Text>
                     )}
                 </View>
 
-                <View className="flex-row items-center gap-4">
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
+                    {isPremium && (
+                        <Pressable onPress={() => router.push("/stats")}>
+                            <MaterialCommunityIcons name="chart-line" size={28} color={t.textMuted} />
+                        </Pressable>
+                    )}
                     <Pressable onPress={() => router.push("/history")}>
-                        <MaterialCommunityIcons
-                            name="calendar-outline"
-                            size={28}
-                            color="#666666"
-                        />
+                        <MaterialCommunityIcons name="calendar-outline" size={28} color={t.textMuted} />
                     </Pressable>
-
                     <Pressable onPress={() => router.push("/settings")}>
-                        <MaterialCommunityIcons
-                            name="cog-outline"
-                            size={28}
-                            color="#666666"
-                        />
+                        <MaterialCommunityIcons name="cog-outline" size={28} color={t.textMuted} />
                     </Pressable>
                 </View>
             </View>
 
             {/* Main Content */}
-            <View className="flex-1 px-8 justify-center">
-                <Text className="text-text-muted text-sm mb-4">TODAY</Text>
+            <View style={{ flex: 1, paddingHorizontal: 32, justifyContent: "center" }}>
+                <Text style={{ color: t.textMuted, fontSize: 12, marginBottom: 16 }}>TODAY</Text>
 
                 <Pressable
                     onPress={todayGoal?.completed ? undefined : completeGoal}
                     onLongPress={editGoal}
                     disabled={todayGoal?.completed}
-                    className="scale-press"
                 >
-                    <View className="flex-row items-start">
-                        <View
-                            className={`w-8 h-8 rounded-full mr-4 items-center justify-center mt-1 ${todayGoal?.completed
-                                ? "bg-success"
-                                : "border-2 border-text-secondary"
-                                }`}
-                        >
+                    <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+                        <View style={{
+                            width: 32, height: 32, borderRadius: 16, marginRight: 16, marginTop: 4,
+                            alignItems: "center", justifyContent: "center",
+                            ...(todayGoal?.completed
+                                ? { backgroundColor: t.success }
+                                : { borderWidth: 2, borderColor: t.textSecondary }),
+                        }}>
                             {todayGoal?.completed && (
-                                <MaterialCommunityIcons name="check" size={20} color="#000000" />
+                                <MaterialCommunityIcons name="check" size={20} color={t.background} />
                             )}
                         </View>
 
-                        <View className="flex-1">
-                            <Text
-                                className={`text-3xl leading-tight ${todayGoal?.completed
-                                    ? "text-text-secondary line-through"
-                                    : "text-text-primary"
-                                    }`}
-                                style={{ fontFamily: "System" }}
-                            >
+                        <View style={{ flex: 1 }}>
+                            <Text style={{
+                                fontSize: 30, lineHeight: 38,
+                                color: todayGoal?.completed ? t.textSecondary : t.textPrimary,
+                                textDecorationLine: todayGoal?.completed ? "line-through" : "none",
+                            }}>
                                 {todayGoal?.title}
                             </Text>
 
                             {todayGoal?.completed && todayGoal.completedAt && (
-                                <Text className="text-text-muted text-sm mt-2">
+                                <Text style={{ color: t.textMuted, fontSize: 14, marginTop: 8 }}>
                                     Completed at{" "}
-                                    {new Date(todayGoal.completedAt).toLocaleTimeString([], {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                    })}
+                                    {new Date(todayGoal.completedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                 </Text>
                             )}
+
+                            {isPremium && todayGoal?.reflection ? (
+                                <Text style={{ color: t.textMuted, fontSize: 13, marginTop: 8, fontStyle: "italic" }}>
+                                    "{todayGoal.reflection}"
+                                </Text>
+                            ) : null}
                         </View>
                     </View>
                 </Pressable>
 
                 {!todayGoal?.completed && (
-                    <Text className="text-text-muted text-sm mt-8 text-center">
+                    <Text style={{ color: t.textMuted, fontSize: 14, marginTop: 32, textAlign: "center" }}>
                         Tap to complete • Long press to edit
                     </Text>
                 )}
             </View>
 
-            {/* Bottom hint */}
             {todayGoal?.completed && (
-                <View className="px-8 pb-12">
-                    <Text className="text-text-muted text-center text-sm">
+                <View style={{ paddingHorizontal: 32, paddingBottom: 48 }}>
+                    <Text style={{ color: t.textMuted, textAlign: "center", fontSize: 14 }}>
                         Done for today. See you tomorrow!
                     </Text>
                 </View>
             )}
+
+            {/* Premium: Reflection Modal */}
+            <Modal visible={showReflection} transparent animationType="slide">
+                <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" }}>
+                    <View style={{
+                        backgroundColor: t.surfaceElevated,
+                        borderTopLeftRadius: 24, borderTopRightRadius: 24,
+                        padding: 32, paddingBottom: 48,
+                    }}>
+                        <Text style={{ color: t.textPrimary, fontSize: 24, fontWeight: "bold", marginBottom: 8 }}>
+                            Goal Complete!
+                        </Text>
+                        <Text style={{ color: t.textSecondary, fontSize: 16, marginBottom: 24 }}>
+                            {streak.current > 1 ? `${streak.current} day streak! ` : ""}Add a reflection?
+                        </Text>
+
+                        <TextInput
+                            value={reflectionText}
+                            onChangeText={setReflectionText}
+                            placeholder="What did you learn or feel?"
+                            placeholderTextColor={t.textMuted}
+                            maxLength={200}
+                            multiline
+                            autoFocus
+                            style={{
+                                color: t.textPrimary, fontSize: 18, minHeight: 80,
+                                borderBottomWidth: 1, borderBottomColor: t.border,
+                                paddingBottom: 12, marginBottom: 24,
+                            }}
+                        />
+
+                        <Pressable
+                            onPress={saveReflection}
+                            style={{ backgroundColor: t.primary, paddingVertical: 18, borderRadius: 14, alignItems: "center", marginBottom: 12 }}
+                        >
+                            <Text style={{ color: t.background, fontSize: 18, fontWeight: "600" }}>
+                                {reflectionText.trim() ? "Save Reflection" : "Done"}
+                            </Text>
+                        </Pressable>
+
+                        <Pressable
+                            onPress={() => { setShowReflection(false); setPendingCompleted(null); }}
+                            style={{ paddingVertical: 12, alignItems: "center" }}
+                        >
+                            <Text style={{ color: t.textSecondary, fontSize: 16 }}>Skip</Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
