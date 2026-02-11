@@ -9,7 +9,7 @@ const KEYS = {
   THEME: '@onegoal:theme',
 };
 
-// ─── User ────────────────────────────────────────────────────────────────────
+// ─── User ─────────────────────────────────────────────────────────────────────
 
 export async function getUser(): Promise<User | null> {
   try {
@@ -23,15 +23,14 @@ export async function getUser(): Promise<User | null> {
 export async function saveUser(user: User): Promise<void> {
   try {
     await AsyncStorage.setItem(KEYS.USER, JSON.stringify(user));
-  } catch (error) {
-    console.error('Error saving user:', error);
+  } catch (e) {
+    console.error('saveUser:', e);
   }
 }
 
 export async function initializeUser(): Promise<User> {
   const existing = await getUser();
   if (existing) return existing;
-
   const newUser: User = {
     id: `user_${Date.now()}`,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -43,7 +42,7 @@ export async function initializeUser(): Promise<User> {
   return newUser;
 }
 
-// ─── Goals ───────────────────────────────────────────────────────────────────
+// ─── Goals ────────────────────────────────────────────────────────────────────
 
 export async function getAllGoals(): Promise<Goal[]> {
   try {
@@ -66,8 +65,8 @@ export async function saveGoal(goal: Goal): Promise<void> {
     if (index >= 0) goals[index] = goal;
     else goals.push(goal);
     await AsyncStorage.setItem(KEYS.GOALS, JSON.stringify(goals));
-  } catch (error) {
-    console.error('Error saving goal:', error);
+  } catch (e) {
+    console.error('saveGoal:', e);
   }
 }
 
@@ -75,8 +74,8 @@ export async function deleteGoal(goalId: string): Promise<void> {
   try {
     const goals = await getAllGoals();
     await AsyncStorage.setItem(KEYS.GOALS, JSON.stringify(goals.filter((g) => g.id !== goalId)));
-  } catch (error) {
-    console.error('Error deleting goal:', error);
+  } catch (e) {
+    console.error('deleteGoal:', e);
   }
 }
 
@@ -84,7 +83,7 @@ export async function clearAllGoals(): Promise<void> {
   await AsyncStorage.setItem(KEYS.GOALS, JSON.stringify([]));
 }
 
-// ─── Streak ──────────────────────────────────────────────────────────────────
+// ─── Streak ───────────────────────────────────────────────────────────────────
 
 export async function getStreak(): Promise<Streak> {
   try {
@@ -92,6 +91,15 @@ export async function getStreak(): Promise<Streak> {
     return data ? JSON.parse(data) : { current: 0, longest: 0, lastUpdated: '' };
   } catch {
     return { current: 0, longest: 0, lastUpdated: '' };
+  }
+}
+
+/** Directly persist a streak object (used by undo to restore pre-completion state). */
+export async function saveStreak(streak: Streak): Promise<void> {
+  try {
+    await AsyncStorage.setItem(KEYS.STREAK, JSON.stringify(streak));
+  } catch (e) {
+    console.error('saveStreak:', e);
   }
 }
 
@@ -106,7 +114,7 @@ export async function updateStreak(completedDate: string): Promise<Streak> {
 
     if (sortedGoals.length === 0) {
       const newStreak = { current: 0, longest: 0, lastUpdated: completedDate };
-      await AsyncStorage.setItem(KEYS.STREAK, JSON.stringify(newStreak));
+      await saveStreak(newStreak);
       return newStreak;
     }
 
@@ -129,7 +137,7 @@ export async function updateStreak(completedDate: string): Promise<Streak> {
       longest: Math.max(currentStreak, streak.longest),
       lastUpdated: completedDate,
     };
-    await AsyncStorage.setItem(KEYS.STREAK, JSON.stringify(newStreak));
+    await saveStreak(newStreak);
     return newStreak;
   } catch {
     return { current: 0, longest: 0, lastUpdated: completedDate };
@@ -137,13 +145,10 @@ export async function updateStreak(completedDate: string): Promise<Streak> {
 }
 
 export async function clearStreak(): Promise<void> {
-  await AsyncStorage.setItem(
-    KEYS.STREAK,
-    JSON.stringify({ current: 0, longest: 0, lastUpdated: '' })
-  );
+  await saveStreak({ current: 0, longest: 0, lastUpdated: '' });
 }
 
-// ─── Theme ───────────────────────────────────────────────────────────────────
+// ─── Theme ────────────────────────────────────────────────────────────────────
 
 export async function getTheme(): Promise<string | null> {
   try {
@@ -157,7 +162,7 @@ export async function saveTheme(themeId: string): Promise<void> {
   await AsyncStorage.setItem(KEYS.THEME, themeId);
 }
 
-// ─── Utilities ───────────────────────────────────────────────────────────────
+// ─── Utilities ────────────────────────────────────────────────────────────────
 
 export function getTodayDate(): string {
   return new Date().toISOString().split('T')[0];
